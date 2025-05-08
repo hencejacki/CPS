@@ -4,19 +4,56 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
+#include <functional>
 
-static inline void ErrorIf(bool cond, const char* file, const char* func, int line, const char* fmt, ...) {
+// Base implementation
+static inline void ErrorImpl(const char* file, const char* func, int line,
+                           const std::function<void()>& cb,
+                           const char* msg) {
+    fprintf(stderr, "[%s][%s:%d] %s\n", file, func, line, msg);
+    fflush(stderr);
+    cb();
+    std::exit(EXIT_FAILURE);
+}
+
+// 1. No callback, simple message
+static inline void ErrorIf(bool cond, const char* file, const char* func, int line,
+                         const char* msg) {
+    if (cond) ErrorImpl(file, func, line, []{}, msg);
+}
+
+// 2. No callback, formatted message (your requested case)
+template<typename... Args>
+static inline void ErrorIf(bool cond, const char* file, const char* func, int line,
+                         const char* fmt, Args... args) {
     if (cond) {
-        std::va_list args;
-        va_start(args, fmt);
-        fprintf(stderr, "[%s][%s:%d] ", file, func, line);
-        vfprintf(stderr, fmt, args);
-        printf("\n");
-        va_end(args);
-        exit(1);
+        char buf[256];
+        snprintf(buf, sizeof(buf), fmt, args...);
+        ErrorImpl(file, func, line, []{}, buf);
     }
 }
 
-#define ErrIf(cond, fmt, ...) ErrorIf(cond, __FILE__, __func__, __LINE__, fmt, ##__VA_ARGS__)
+// 3. With callback, simple message
+static inline void ErrorIf(bool cond, const char* file, const char* func, int line,
+                         const std::function<void()>& cb,
+                         const char* msg) {
+    if (cond) ErrorImpl(file, func, line, cb, msg);
+}
+
+// 4. With callback, formatted message
+template<typename... Args>
+static inline void ErrorIf(bool cond, const char* file, const char* func, int line,
+                         const std::function<void()>& cb,
+                         const char* fmt, Args... args) {
+    if (cond) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), fmt, args...);
+        ErrorImpl(file, func, line, cb, buf);
+    }
+}
+
+// Macro to select the right version
+#define ErrIf(cond, ...) \
+    ErrorIf((cond), __FILE__, __func__, __LINE__, __VA_ARGS__)
 
 #endif // ERR_HPP
