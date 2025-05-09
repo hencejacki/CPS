@@ -48,7 +48,7 @@ int main(int argc, char *const argv[])
     fprintf(stdout, "forward_port: %d, forward_origin: %s, keep-alive: %d.\n", forward_port, forward_origin, keep_alive_seconds);
     fflush(stdout);
 #endif // _DEBUG
-    NetCacheServerUtil::GetInstance().Init(forward_port);
+    NetCacheServerUtil::GetInstance().Init(forward_port, keep_alive_seconds);
     NetCacheServerUtil::GetInstance().Start(forward_origin);
     exit(EXIT_SUCCESS);
 }

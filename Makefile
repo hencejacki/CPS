@@ -1,5 +1,5 @@
 CC := g++
-CXXFLAGS := --std=c++11 -Iinclude -Wall -Wno-unused-function -D_DEBUG -g
+CXXFLAGS := --std=c++11 -Iinclude -Wall -Wno-unused-function -O3
 LDFLAGS := -lcrypto -lssl
 
 SRCS := $(wildcard src/*.cc)

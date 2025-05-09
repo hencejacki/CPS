@@ -43,7 +43,7 @@ void NetCacheServerUtil::Init(int port, int keep_alive_seconds, const char *ip, 
     sigprocmask(SIG_BLOCK, &sigmask_, &origmask_);
 
     // Cache timer init
-    CacheTimer::GetInstance().Init(5, 300);
+    CacheTimer::GetInstance().Init(5, std::max(300, keep_alive_seconds_));
 }
 
 void NetCacheServerUtil::readMsg(int clisock, std::string &req)
@@ -171,6 +171,8 @@ void NetCacheServerUtil::handleConnect(int clisock)
     HttpResponse resp_origin{};
     if (cache.empty()) {
         // Cache miss
+        fprintf(stdout, "Cache miss for [%s].\n", http_req_.request_url.c_str());
+        fflush(stdout);
         int ret = NetClientUtil::GetInstance()
                     .Get(http_req_.request_url.c_str(), http_req_.header_origin, resp_origin);
         if (0 != ret) {
@@ -186,6 +188,8 @@ void NetCacheServerUtil::handleConnect(int clisock)
         }
     } else {
         // Cache Hit
+        fprintf(stdout, "Cache hit for [%s].\n", http_req_.request_url.c_str());
+        fflush(stdout);
         resp_origin.http_version = "1.1";
         resp_origin.status_code = "200";
         resp_origin.status_msg = "OK";
@@ -197,7 +201,6 @@ void NetCacheServerUtil::handleConnect(int clisock)
     constructHttpResponse(resp_origin, resp);
     writeMsg(clisock, resp);
     http_req_ = {};
-    // resp_origin = {};
     close(clisock);
 }
 
@@ -247,6 +250,9 @@ void NetCacheServerUtil::Start(const std::string& forward_origin) {
 
     ErrIf(-1 == bind(sock, (sockaddr*)&addr, sizeof(addr)), [&](){close(sock);}, "Bind failed.");
     ErrIf(-1 == listen(sock, SOMAXCONN), [&](){close(sock);}, "Listen failed.");
+
+    fprintf(stdout, "Start successfully.");
+    fflush(stdout);
 
     fd_set rfds;
     struct timespec tp;
