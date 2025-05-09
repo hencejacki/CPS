@@ -1,6 +1,6 @@
 #include "net_client_util.hpp"
 
-NetClientUtil::NetClientUtil() : domain_(""), port_(0), timeout_(0), max_retry_(0), ssl_ctx_(nullptr), status_(ParseStatus::kParseStatusLine)
+NetClientUtil::NetClientUtil() : domain_(""), port_(0), timeout_(0), max_retry_(0), ssl_ctx_(nullptr), status_(HttpRespParseStatus::kParseStatusLine)
 {
 }
 
@@ -62,27 +62,27 @@ void NetClientUtil::constructGetRequest(const char* endpoint, const std::string&
 #endif
 }
 
-void NetClientUtil::parseHttpResponse(const std::string& resp, std::string &content)
+void NetClientUtil::parseHttpResponse(const std::string& resp)
 {
     size_t resp_len = resp.size();
     const char* p = resp.c_str();
     int parsed_bytes = 0;
     const char CRLF[] = "\r\n";
-    while (status_ != ParseStatus::kParseFinish) {
+    while (status_ != HttpRespParseStatus::kParseFinish) {
         const char* line_end = std::search(p + parsed_bytes, p + resp_len, CRLF, CRLF + 2);
         std::string line(p + parsed_bytes, line_end);
         switch (status_)
         {
-        case ParseStatus::kParseStatusLine:
+        case HttpRespParseStatus::kParseStatusLine:
             parseStatusLine(line);
             break;
-        case ParseStatus::kParseHeaderField:
+        case HttpRespParseStatus::kParseHeaderField:
             parseHeaderField(line);
             if (resp_len - parsed_bytes <= 2) {
-                status_ = ParseStatus::kParseFinish;
+                status_ = HttpRespParseStatus::kParseFinish;
             }
             break;
-        case ParseStatus::kParseMessageBody:
+        case HttpRespParseStatus::kParseMessageBody:
             parseMessageBody(line);
             break;
         default:
@@ -90,10 +90,10 @@ void NetClientUtil::parseHttpResponse(const std::string& resp, std::string &cont
         }
         parsed_bytes += (line_end + 2 - (p + parsed_bytes));
     }
+    status_ = HttpRespParseStatus::kParseStatusLine;
     if (http_resp_.status_code == "200") {
-        content = http_resp_.body;
 #ifdef _DEBUG
-        fprintf(stderr, "Response body: [%s].\n", content.c_str());
+        fprintf(stderr, "Response body: [%s].\n", http_resp_.body.c_str());
 #endif // _DEBUG
     } else {
         fprintf(stderr, "Got error response, status code: [%s], msg: [%s].\n", http_resp_.status_code.c_str(), http_resp_.status_msg.c_str());
@@ -108,9 +108,9 @@ void NetClientUtil::parseStatusLine(const std::string &line)
         http_resp_.http_version = match[1];
         http_resp_.status_code  = match[2];
         http_resp_.status_msg   = match[3];
-        status_ = ParseStatus::kParseHeaderField;
+        status_ = HttpRespParseStatus::kParseHeaderField;
     } else {
-        status_ = ParseStatus::kParseFinish;
+        status_ = HttpRespParseStatus::kParseFinish;
 #ifdef _DEBUG
         fprintf(stderr, "Failed to parse status line: [%s].\n", line.c_str());
 #endif // _DEBUG
@@ -123,15 +123,16 @@ void NetClientUtil::parseHeaderField(const std::string &line)
     std::smatch match;
     if (std::regex_match(line, match, pattern)) {
         http_resp_.header[match[1]] = match[2];
+        http_resp_.header_origin = line;
     } else {
-        status_ = ParseStatus::kParseMessageBody;
+        status_ = HttpRespParseStatus::kParseMessageBody;
     }
 }
 
 void NetClientUtil::parseMessageBody(const std::string &line)
 {
     http_resp_.body = line;
-    status_ = ParseStatus::kParseFinish;
+    status_ = HttpRespParseStatus::kParseFinish;
 }
 
 int NetClientUtil::netRead(int sock, char *buf, size_t n, SSL *ssl)
@@ -150,7 +151,7 @@ int NetClientUtil::netWrite(int sock, const char *buf, size_t n, SSL *ssl)
     return SSL_write(ssl, buf, static_cast<int>(n));
 }
 
-int NetClientUtil::Get(const char *endpoint, const std::string& header, std::string& resp) {
+int NetClientUtil::Get(const char *endpoint, const std::string& header, HttpResponse& resp) {
     int sock = -1;
     SSL* ssl = nullptr;
     try {
@@ -221,14 +222,15 @@ int NetClientUtil::Get(const char *endpoint, const std::string& header, std::str
 #ifdef _DEBUG
         fprintf(stderr, "%s\n", tmp.c_str());
 #endif // _DEBUG
-        parseHttpResponse(tmp, resp);
+        parseHttpResponse(tmp);
+        resp = http_resp_;
         if (is_ssl_) SSL_shutdown(ssl);
         close(sock);
         if (is_ssl_) SSL_free(ssl);
         return 0;
     } catch (std::exception& e) {
         if (sock != -1) close(sock);
-        ErrIf(true, "%s", e.what());
+        fprintf(stderr, "%s\n", e.what());
         return -1;
     }
 }

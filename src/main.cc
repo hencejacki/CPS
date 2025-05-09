@@ -1,5 +1,5 @@
-#include "err.hpp"
 #include "getopt.h"
+#include "net_cache_server_util.hpp"
 
 struct option longopts[] = {
     {"port", required_argument, 0, 0},
@@ -19,7 +19,7 @@ int main(int argc, char *const argv[])
     int c = 0;
     int longindex = -1;
     int forward_port = 3000;
-    const char *forward_origin = "http://dummyjson.com";
+    const char *forward_origin = "https://dummyjson.com";
     int keep_alive_seconds = 300;
     while ((c = getopt_long(argc, argv, "", longopts, &longindex)) != -1)
     {
@@ -45,7 +45,10 @@ int main(int argc, char *const argv[])
     }
     ErrIf(longindex == -1, "Usage:\r\n%s --port <number> --origin <url> --keep-alive <seconds> or %s --clear-cache", argv[0], argv[0]);
 #ifdef _DEBUG
-    fprintf(stdout, "forward_port: %d, forward_origin: %s, keep-alive: %d.", forward_port, forward_origin, keep_alive_seconds);
+    fprintf(stdout, "forward_port: %d, forward_origin: %s, keep-alive: %d.\n", forward_port, forward_origin, keep_alive_seconds);
+    fflush(stdout);
 #endif // _DEBUG
+    NetCacheServerUtil::GetInstance().Init(forward_port);
+    NetCacheServerUtil::GetInstance().Start(forward_origin);
     exit(EXIT_SUCCESS);
 }

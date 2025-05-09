@@ -21,10 +21,14 @@ public:
     CacheTimer(const CacheTimer&&) = delete;
     CacheTimer& operator=(const CacheTimer&) = delete;
     CacheTimer& operator=(const CacheTimer&&) = delete;
+    virtual ~CacheTimer();
 
     static CacheTimer& GetInstance();
 
-    void Init(int interval, int expires);
+    /// @brief Init
+    /// @param interval check interval(s)
+    /// @param expires expire time(s)
+    void Init(int interval = 5, int expires = 30);
 
     void Start();
 
@@ -32,7 +36,7 @@ public:
 
     std::string GetCache(const std::string& url);
 
-    void KeepCacheAlive(const std::string& url);
+    void KeepCacheAlive(const std::string& url, const std::string& content = "");
 
 private:
     CacheTimer();
@@ -42,8 +46,8 @@ private:
 private:
     std::map<TimePoint, std::string> time_map_;
     std::map<std::string, TMDBCache> cache_map_;
-    std::chrono::milliseconds check_interval_;
-    std::chrono::milliseconds expire_interval_;
+    std::chrono::seconds check_interval_;
+    std::chrono::seconds expire_interval_;
     bool running_;
     std::mutex mtx_;
     std::thread t_;

@@ -12,8 +12,10 @@
 #include <sys/time.h>
 #include <sys/signal.h>
 #include "err.hpp"
+#include "cache_timer.hpp"
+#include "net_client_util.hpp"
 
-enum class ParseStatus {
+enum class HttpReqParseStatus {
     kParseRequestLine,
     kParseHeaderField,
     kParseMessageBody,
@@ -25,6 +27,7 @@ struct HttpRequest {
     std::string request_method;
     std::string request_url;
     std::unordered_map<std::string, std::string> header;
+    std::string header_origin;
     std::string body;
 };
 
@@ -40,7 +43,7 @@ public:
 
     void Init(int port, int keep_alive_seconds = 300, const char* ip = "127.0.0.1", bool is_ssl = false);
 
-    void Start();
+    void Start(const std::string& forward_origin);
 
     static void SignalHandler(int sig);
 
@@ -59,6 +62,12 @@ private:
 
     void parseMessageBody(const std::string& line);
 
+    void constructHttpResponse(const HttpResponse& resp_origin, std::string& resp);
+
+    void handleConnect(int clisock);
+
+    void extendHeader(HttpResponse& resp, const char* extend);
+
 private:
     std::string ip_;
     uint16_t port_;
@@ -69,7 +78,7 @@ private:
     struct sigaction sa_;
 
     HttpRequest http_req_;
-    ParseStatus status_;
+    HttpReqParseStatus status_;
 };
 
 #endif // NET_SERVER_UTIL_HPP

@@ -16,7 +16,7 @@
 #include <openssl/err.h>
 #include "err.hpp"
 
-enum class ParseStatus {
+enum class HttpRespParseStatus {
     kParseStatusLine,
     kParseHeaderField,
     kParseMessageBody,
@@ -28,6 +28,7 @@ struct HttpResponse {
     std::string status_code;
     std::string status_msg;
     std::unordered_map<std::string, std::string> header;
+    std::string header_origin;
     std::string body;
 };
 
@@ -49,14 +50,14 @@ public:
      * @param header request header
      * @param resp Response message
      */
-    int Get(const char* endpoint, const std::string& header, std::string& resp);
+    int Get(const char* endpoint, const std::string& header, HttpResponse& resp);
 
 private:
     NetClientUtil();
 
     void constructGetRequest(const char* endpoint, const std::string& header, std::string& req);
 
-    void parseHttpResponse(const std::string& resp, std::string& content);
+    void parseHttpResponse(const std::string& resp);
 
     void parseStatusLine(const std::string& line);
 
@@ -76,7 +77,7 @@ private:
     bool is_ssl_;
     SSL_CTX* ssl_ctx_;
     HttpResponse http_resp_;
-    ParseStatus status_;
+    HttpRespParseStatus status_;
 };
 
 #endif // NET_CLIENT_UTIL_HPP

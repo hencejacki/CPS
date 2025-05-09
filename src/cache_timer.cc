@@ -15,8 +15,8 @@ CacheTimer& CacheTimer::GetInstance() {
 
 void CacheTimer::Init(int interval, int expires)
 {
-    check_interval_ = std::chrono::milliseconds(interval);
-    expire_interval_ = std::chrono::milliseconds(expires);
+    check_interval_ = std::chrono::seconds(interval);
+    expire_interval_ = std::chrono::seconds(expires);
 }
 
 void CacheTimer::Start() {
@@ -42,7 +42,7 @@ std::string CacheTimer::GetCache(const std::string &url)
     return cache_map_.count(url) == 0 ? "" : cache_map_.find(url)->second.cache_content;
 }
 
-void CacheTimer::KeepCacheAlive(const std::string &url)
+void CacheTimer::KeepCacheAlive(const std::string &url, const std::string& content)
 {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = cache_map_.find(url);
@@ -50,6 +50,15 @@ void CacheTimer::KeepCacheAlive(const std::string &url)
         time_map_.erase(it->second.last_active);
         it->second.last_active = std::chrono::steady_clock::now();
         time_map_[it->second.last_active] = url;
+    } else {
+        auto now = std::chrono::steady_clock::now();
+        TMDBCache cache{
+            .dest_url = url,
+            .cache_content = content,
+            .last_active = now
+        };
+        cache_map_[url] = cache;
+        time_map_.emplace(now, url);
     }
 }
 

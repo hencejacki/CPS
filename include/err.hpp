@@ -13,7 +13,7 @@ static inline void ErrorImpl(const char* file, const char* func, int line,
     fprintf(stderr, "[%s][%s:%d] %s\n", file, func, line, msg);
     fflush(stderr);
     cb();
-    std::exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
 
 // 1. No callback, simple message
