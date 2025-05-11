@@ -10,7 +10,7 @@
 static inline void ErrorImpl(const char* file, const char* func, int line,
                            const std::function<void()>& cb,
                            const char* msg) {
-    fprintf(stderr, "[%s][%s:%d] %s\n", file, func, line, msg);
+    fprintf(stderr, "[%s][%s:%d] %s(%d)\n", file, func, line, msg, errno);
     fflush(stderr);
     cb();
     exit(EXIT_FAILURE);

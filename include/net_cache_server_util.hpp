@@ -11,9 +11,18 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/signal.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "err.hpp"
 #include "cache_timer.hpp"
 #include "net_client_util.hpp"
+
+#define NAMED_PIPE "/tmp/net_cache_server_pipe"
+
+struct PipeMessage {
+    int pid;
+};
 
 enum class HttpReqParseStatus {
     kParseRequestLine,
@@ -79,6 +88,8 @@ private:
 
     HttpRequest http_req_;
     HttpReqParseStatus status_;
+
+    int pipe_fd_;
 };
 
 #endif // NET_SERVER_UTIL_HPP

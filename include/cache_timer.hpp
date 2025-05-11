@@ -38,6 +38,8 @@ public:
 
     void KeepCacheAlive(const std::string& url, const std::string& content = "");
 
+    void ClearCache();
+
 private:
     CacheTimer();
 

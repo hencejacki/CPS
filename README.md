@@ -29,4 +29,5 @@ caching-proxy --clear-cache
 ## TODO
 
 - [ ] Support https server.
-- [ ] Support multi-thread.
+- [ ] Support multithread.
+- [ ] Support multi-port caching

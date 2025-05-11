@@ -6,7 +6,8 @@ NetCacheServerUtil::NetCacheServerUtil()
     , keep_alive_seconds_(300)
     , is_ssl_(false)
     , http_req_()
-    , status_(HttpReqParseStatus::kParseRequestLine) {
+    , status_(HttpReqParseStatus::kParseRequestLine)
+    , pipe_fd_(-1) {
 
 }
 
@@ -41,6 +42,14 @@ void NetCacheServerUtil::Init(int port, int keep_alive_seconds, const char *ip, 
     sigemptyset(&sigmask_);
     sigaddset(&sigmask_, SIGINT);
     sigprocmask(SIG_BLOCK, &sigmask_, &origmask_);
+
+    // Create named pipe
+    ErrIf(0 != mkfifo(NAMED_PIPE, 0666), "Create pipe failed.");
+    ErrIf(
+        (pipe_fd_ = open(NAMED_PIPE, O_RDWR)) == -1, 
+        [&](){unlink(NAMED_PIPE);}, 
+        "Open pipe failed."
+    );
 
     // Cache timer init
     CacheTimer::GetInstance().Init(5, std::max(300, keep_alive_seconds_));
@@ -241,43 +250,61 @@ void NetCacheServerUtil::Start(const std::string& forward_origin) {
     // Create socket
     int sock = -1;
     sock = socket(AF_INET, SOCK_STREAM, 0);
-    ErrIf(sock == -1, "Create socket failed.");
+    ErrIf(sock == -1, [&](){unlink(NAMED_PIPE);}, "Create socket failed.");
     
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port_);
     inet_pton(AF_INET, ip_.c_str(), &addr.sin_addr);
 
-    ErrIf(-1 == bind(sock, (sockaddr*)&addr, sizeof(addr)), [&](){close(sock);}, "Bind failed.");
-    ErrIf(-1 == listen(sock, SOMAXCONN), [&](){close(sock);}, "Listen failed.");
+    ErrIf(-1 == bind(sock, (sockaddr*)&addr, sizeof(addr)), [&](){close(sock);unlink(NAMED_PIPE);}, "Bind failed.");
+    ErrIf(-1 == listen(sock, SOMAXCONN), [&](){close(sock);unlink(NAMED_PIPE);}, "Listen failed.");
 
-    fprintf(stdout, "Start successfully.");
+    fprintf(stdout, "Start successfully.\n");
     fflush(stdout);
 
     fd_set rfds;
     struct timespec tp;
     int ret = -1;
+    int max_fd = std::max(sock, pipe_fd_);
     while (true) {
         tp.tv_sec  = 3;
         tp.tv_nsec = 0;
         FD_ZERO(&rfds);
+        FD_SET(pipe_fd_, &rfds);
         FD_SET(sock, &rfds);
 
-        ret = pselect(sock + 1, &rfds, 0, 0, &tp, &origmask_);
+        ret = pselect(max_fd + 1, &rfds, 0, 0, &tp, &origmask_);
         if (ret == -1 && errno == EINTR) {
             // Interrupted by signal
+            close(pipe_fd_);
             close(sock);
             break;
         } else if (ret == -1) {
             // Error occurs
+            fprintf(stderr, "Error occurs\n");
+            fflush(stderr);
         } else if (ret == 0) {
             // Timeout
         } else {
-            struct sockaddr_in cliaddr;
-            socklen_t clilen;
-            int clisock = ::accept(sock, (sockaddr*)&cliaddr, &clilen);
-            ErrIf(-1 == clisock, [&](){close(sock);}, "Accept operation failed.");
-            handleConnect(clisock);
+            // Clear cache
+            if (FD_ISSET(pipe_fd_, &rfds)) {
+                PipeMessage msg;
+                int bytes_read = read(pipe_fd_, &msg, sizeof(msg));
+                if (bytes_read < 0) {
+                    fprintf(stderr, "Read from pipe failed\n");
+                    continue;
+                }
+                CacheTimer::GetInstance().ClearCache();
+            }
+            // Cache proxy
+            if (FD_ISSET(sock, &rfds)) {
+                struct sockaddr_in cliaddr;
+                socklen_t clilen;
+                int clisock = ::accept(sock, (sockaddr*)&cliaddr, &clilen);
+                ErrIf(-1 == clisock, [&](){close(sock);unlink(NAMED_PIPE);}, "Accept operation failed.");
+                handleConnect(clisock);   
+            }
         }
     }
 }

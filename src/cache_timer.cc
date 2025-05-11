@@ -62,6 +62,13 @@ void CacheTimer::KeepCacheAlive(const std::string &url, const std::string& conte
     }
 }
 
+void CacheTimer::ClearCache()
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+    time_map_.clear();
+    cache_map_.clear();
+}
+
 void CacheTimer::checkInactiveCache()
 {
     std::lock_guard<std::mutex> lock(mtx_);
