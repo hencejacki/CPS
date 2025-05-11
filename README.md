@@ -31,3 +31,7 @@ caching-proxy --clear-cache
 - [ ] Support https server.
 - [ ] Support multithread.
 - [ ] Support multi-port caching
+
+## Thanks
+
+[roadmap.sh](https://roadmap.sh/projects/caching-server)
